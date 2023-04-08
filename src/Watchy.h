@@ -55,11 +55,15 @@ public:
   static void displayBusyCallback(const void *);
   float getBatteryVoltage();
   void vibMotor(uint8_t intervalMs = 100, uint8_t length = 20);
-
+  int getUserModValue(int index);
   void handleButtonPress();
   void showMenu(byte menuIndex, bool partialRefresh);
   void showFastMenu(byte menuIndex);
   void showAbout();
+  void increaseCustomValue();
+  void decreaseCustomValue();
+  void showUserMods(byte menuIndex, bool partialRefresh);
+  void handleOpenUMApp(byte mIndex,bool partialRefresh);
   void showBuzz();
   void showAccelerometer();
   void showUpdateFW();
@@ -78,7 +82,7 @@ public:
   void showWatchFace(bool partialRefresh);
   virtual void drawWatchFace(); // override this method for different watch
                                 // faces
-
+  virtual void UMdrawWatchFace(int UMPointers[]);
 private:
   void _bmaConfig();
   static void _configModeCallback(WiFiManager *myWiFiManager);
@@ -90,6 +94,7 @@ private:
 
 extern RTC_DATA_ATTR int guiState;
 extern RTC_DATA_ATTR int menuIndex;
+extern RTC_DATA_ATTR int UMMenuIndex;
 extern RTC_DATA_ATTR BMA423 sensor;
 extern RTC_DATA_ATTR bool WIFI_CONFIGURED;
 extern RTC_DATA_ATTR bool BLE_CONFIGURED;

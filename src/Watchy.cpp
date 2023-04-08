@@ -1,4 +1,5 @@
 #include "Watchy.h"
+#include "UserModConfig.h"
 
 WatchyRTC Watchy::RTC;
 GxEPD2_BW<WatchyDisplay, WatchyDisplay::HEIGHT> Watchy::display(
@@ -6,6 +7,11 @@ GxEPD2_BW<WatchyDisplay, WatchyDisplay::HEIGHT> Watchy::display(
 
 RTC_DATA_ATTR int guiState;
 RTC_DATA_ATTR int menuIndex;
+RTC_DATA_ATTR int UMMenuIndex = 0;
+
+//RTC_DATA_ATTR int UMcurrentWatchFace = 0;
+//RTC_DATA_ATTR int* UMPointers[USERMOD_MENU_LENGTH] = {&UMcurrentWatchFace};
+
 RTC_DATA_ATTR BMA423 sensor;
 RTC_DATA_ATTR bool WIFI_CONFIGURED;
 RTC_DATA_ATTR bool BLE_CONFIGURED;
@@ -50,12 +56,22 @@ void Watchy::init(String datetime) {
         alreadyInMenu = true;
       }
       break;
+    case USERMOD_MENU_STATE:
+      // Return to watchface if in menu for more than one tick
+      if (alreadyInMenu) {
+        guiState = WATCHFACE_STATE;
+        showWatchFace(false);
+      } else {
+        alreadyInMenu = true;
+      }
+      break;
     }
     break;
   case ESP_SLEEP_WAKEUP_EXT1: // button Press
     handleButtonPress();
     break;
   default: // reset
+    //int UMcurrentWatchFace = 0;
     RTC.config(datetime);
     _bmaConfig();
     gmtOffset = settings.gmtOffset;
@@ -66,6 +82,10 @@ void Watchy::init(String datetime) {
     break;
   }
   deepSleep();
+}
+
+int Watchy::getUserModValue(int index) {
+  return *UMPointers[index];
 }
 
 void Watchy::displayBusyCallback(const void *) {
@@ -127,10 +147,15 @@ void Watchy::handleButtonPress() {
       case 6:
         showSyncNTP();
         break;
+      case 7:
+        showUserMods(UMMenuIndex,false);
+        break;
       default:
         break;
       }
-    } else if (guiState == FW_UPDATE_STATE) {
+    } else if (guiState == USERMOD_MENU_STATE) {
+      handleOpenUMApp(UMMenuIndex,false);
+    }  else if (guiState == FW_UPDATE_STATE) {
       updateFWBegin();
     }
   }
@@ -141,8 +166,12 @@ void Watchy::handleButtonPress() {
       showWatchFace(false);
     } else if (guiState == APP_STATE) {
       showMenu(menuIndex, false); // exit to menu if already in app
+    } else if (guiState == USERMOD_MENU_STATE) { // TODO: go back to Main menu instead of watchFace
+      showMenu(menuIndex, false);
     } else if (guiState == FW_UPDATE_STATE) {
       showMenu(menuIndex, false); // exit to menu if already in app
+    } else if (guiState == USERMOD_APP_STATE) {
+      showUserMods(menuIndex, false);
     } else if (guiState == WATCHFACE_STATE) {
       return;
     }
@@ -155,6 +184,14 @@ void Watchy::handleButtonPress() {
         menuIndex = MENU_LENGTH - 1;
       }
       showMenu(menuIndex, true);
+    } else if (guiState == USERMOD_MENU_STATE) { // increment menu index
+      UMMenuIndex--;
+      if (UMMenuIndex < 0) {
+        UMMenuIndex = USERMOD_MENU_LENGTH - 1;
+      }
+      showUserMods(UMMenuIndex, true);
+    } else if (guiState == USERMOD_APP_STATE) {
+      increaseCustomValue();
     } else if (guiState == WATCHFACE_STATE) {
       return;
     }
@@ -167,6 +204,14 @@ void Watchy::handleButtonPress() {
         menuIndex = 0;
       }
       showMenu(menuIndex, true);
+    } else if (guiState == USERMOD_MENU_STATE) { // increment menu index
+      UMMenuIndex++;
+      if (UMMenuIndex > USERMOD_MENU_LENGTH - 1) {
+        UMMenuIndex = 0;
+      }
+      showUserMods(menuIndex, true);
+    } else if (guiState == USERMOD_APP_STATE) {
+      decreaseCustomValue();
     } else if (guiState == WATCHFACE_STATE) {
       return;
     }
@@ -209,9 +254,14 @@ void Watchy::handleButtonPress() {
           case 6:
             showSyncNTP();
             break;
+          case 7:
+            showUserMods(UMMenuIndex,false);
+            break;
           default:
             break;
           }
+        } else if (guiState == USERMOD_MENU_STATE) {
+          handleOpenUMApp(UMMenuIndex,false);
         } else if (guiState == FW_UPDATE_STATE) {
           updateFWBegin();
         }
@@ -224,6 +274,10 @@ void Watchy::handleButtonPress() {
           break; // leave loop
         } else if (guiState == APP_STATE) {
           showMenu(menuIndex, false); // exit to menu if already in app
+        } else if (guiState == USERMOD_MENU_STATE) { // TODO: go back to Main menu instead of watchFace
+          showMenu(menuIndex, false);
+        } else if (guiState == USERMOD_APP_STATE) {
+          showUserMods(menuIndex, false);
         } else if (guiState == FW_UPDATE_STATE) {
           showMenu(menuIndex, false); // exit to menu if already in app
         }
@@ -235,6 +289,14 @@ void Watchy::handleButtonPress() {
             menuIndex = MENU_LENGTH - 1;
           }
           showFastMenu(menuIndex);
+        } else if (guiState == USERMOD_APP_STATE) {
+          increaseCustomValue();
+        } else if (guiState == USERMOD_MENU_STATE) { // increment menu index
+          UMMenuIndex--;
+          if (UMMenuIndex < 0) {
+            UMMenuIndex = USERMOD_MENU_LENGTH - 1;
+          }
+          showUserMods(UMMenuIndex, true);
         }
       } else if (digitalRead(DOWN_BTN_PIN) == 1) {
         lastTimeout = millis();
@@ -244,10 +306,75 @@ void Watchy::handleButtonPress() {
             menuIndex = 0;
           }
           showFastMenu(menuIndex);
+        } else if (guiState == USERMOD_APP_STATE) {
+          decreaseCustomValue();
+        } else if (guiState == USERMOD_MENU_STATE) { // increment menu index
+          UMMenuIndex++;
+          if (UMMenuIndex > USERMOD_MENU_LENGTH - 1) {
+        UMMenuIndex = 0;
+      }
+          showUserMods(UMMenuIndex, true);
         }
       }
     }
   }
+}
+
+void Watchy::increaseCustomValue() {
+  (*UMPointers[UMMenuIndex])++;
+  delay(100);
+  handleOpenUMApp(UMMenuIndex,true);
+}
+
+void Watchy::decreaseCustomValue() {
+  (*UMPointers[UMMenuIndex])--;
+  delay(100);
+  handleOpenUMApp(UMMenuIndex,true);
+}
+
+void Watchy::showUserMods(byte menuIndex, bool partialRefresh) {
+  display.setFullWindow();
+  display.fillScreen(GxEPD_BLACK);
+  display.setFont(&FreeMonoBold9pt7b);
+
+  int16_t x1, y1;
+  uint16_t w, h;
+  int16_t yPos;
+  const char *menuItems[] = {"Switch Watchface","test"};
+  for (int i = 0; i < USERMOD_MENU_LENGTH; i++) {
+    yPos = MENU_HEIGHT + (MENU_HEIGHT * i);
+    display.setCursor(0, yPos);
+    if (i == menuIndex) {
+      display.getTextBounds(menuItems[i], 0, yPos, &x1, &y1, &w, &h);
+      display.fillRect(x1 - 1, y1 - 10, 200, h + 15, GxEPD_WHITE);
+      display.setTextColor(GxEPD_BLACK);
+      display.println(menuItems[i]);
+    } else {
+      display.setTextColor(GxEPD_WHITE);
+      display.println(menuItems[i]);
+    }
+  }
+
+  display.display(partialRefresh);
+
+  guiState = USERMOD_MENU_STATE;
+  alreadyInMenu = false;
+  
+}
+
+void Watchy::handleOpenUMApp(byte mIndex,bool partialRefresh) {
+  guiState = USERMOD_APP_STATE;
+  display.setFullWindow();
+  display.fillScreen(GxEPD_BLACK);
+  display.setFont(&FreeMonoBold9pt7b);
+  display.setTextColor(GxEPD_WHITE);
+  display.setCursor(0, 20);
+
+  display.println(UMMods[mIndex]);
+  display.println(*UMPointers[mIndex]);
+
+  display.display(partialRefresh); // full refresh
+
 }
 
 void Watchy::showMenu(byte menuIndex, bool partialRefresh) {
@@ -262,7 +389,7 @@ void Watchy::showMenu(byte menuIndex, bool partialRefresh) {
   const char *menuItems[] = {
       "About Watchy", "Vibrate Motor", "Show Accelerometer",
       "Set Time",     "Setup WiFi",    "Update Firmware",
-      "Sync NTP"};
+      "Sync NTP", "UserMods"};
   for (int i = 0; i < MENU_LENGTH; i++) {
     yPos = MENU_HEIGHT + (MENU_HEIGHT * i);
     display.setCursor(0, yPos);
@@ -295,7 +422,7 @@ void Watchy::showFastMenu(byte menuIndex) {
   const char *menuItems[] = {
       "About Watchy", "Vibrate Motor", "Show Accelerometer",
       "Set Time",     "Setup WiFi",    "Update Firmware",
-      "Sync NTP"};
+      "Sync NTP", "UserMods"};
   for (int i = 0; i < MENU_LENGTH; i++) {
     yPos = MENU_HEIGHT + (MENU_HEIGHT * i);
     display.setCursor(0, yPos);
@@ -321,6 +448,9 @@ void Watchy::showAbout() {
   display.setFont(&FreeMonoBold9pt7b);
   display.setTextColor(GxEPD_WHITE);
   display.setCursor(0, 20);
+
+  display.print("UserMod v");
+  display.println(UMVERSION);
 
   display.print("LibVer: ");
   display.println(WATCHY_LIB_VER);
@@ -348,7 +478,7 @@ void Watchy::showAbout() {
   display.print(hours);
   display.print("h");
   display.print(minutes);
-  display.print("m");    
+  display.println("m");
   display.display(false); // full refresh
 
   guiState = APP_STATE;
@@ -612,7 +742,7 @@ void Watchy::showWatchFace(bool partialRefresh) {
 }
 
 void Watchy::drawWatchFace() {
-  display.setFont(&DSEG7_Classic_Bold_53);
+  /*display.setFont(&DSEG7_Classic_Bold_53);
   display.setCursor(5, 53 + 60);
   if (currentTime.Hour < 10) {
     display.print("0");
@@ -622,7 +752,18 @@ void Watchy::drawWatchFace() {
   if (currentTime.Minute < 10) {
     display.print("0");
   }
-  display.println(currentTime.Minute);
+  display.println(currentTime.Minute);*/
+  int menuItems[] = {};
+  for (int i = 0; i < sizeof(UMPointers); i++)
+  {
+    menuItems[i] = *(UMPointers[i]);
+  }
+  
+  UMdrawWatchFace(menuItems);
+}
+
+void Watchy::UMdrawWatchFace(int UMPointers[]) {
+  
 }
 
 weatherData Watchy::getWeatherData() {
