@@ -19,8 +19,11 @@ RTC_DATA_ATTR long gmtOffset = 0;
 RTC_DATA_ATTR bool alreadyInMenu         = true;
 RTC_DATA_ATTR tmElements_t bootTime;
 
+// add your own variables here:
 RTC_DATA_ATTR int UMcurrentWatchFace = 0;
-extern RTC_DATA_ATTR int UMtestValue = 0;
+RTC_DATA_ATTR int UMtestValue = 0;
+
+// add pointers to your variables here
 RTC_DATA_ATTR int* UMPointers[USERMOD_MENU_LENGTH] = {&UMcurrentWatchFace, &UMtestValue};
 
 void Watchy::init(String datetime) {
@@ -338,18 +341,17 @@ void Watchy::showUserMods(byte menuIndex, bool partialRefresh) {
   int16_t x1, y1;
   uint16_t w, h;
   int16_t yPos;
-  const char *menuItems[] = {"Switch Watchface","test"};
   for (int i = 0; i < USERMOD_MENU_LENGTH; i++) {
     yPos = MENU_HEIGHT + (MENU_HEIGHT * i);
     display.setCursor(0, yPos);
     if (i == menuIndex) {
-      display.getTextBounds(menuItems[i], 0, yPos, &x1, &y1, &w, &h);
+      display.getTextBounds(UMMods[i], 0, yPos, &x1, &y1, &w, &h);
       display.fillRect(x1 - 1, y1 - 10, 200, h + 15, GxEPD_WHITE);
       display.setTextColor(GxEPD_BLACK);
-      display.println(menuItems[i]);
+      display.println(UMMods[i]);
     } else {
       display.setTextColor(GxEPD_WHITE);
-      display.println(menuItems[i]);
+      display.println(UMMods[i]);
     }
   }
 
