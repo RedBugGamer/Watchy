@@ -1,6 +1,7 @@
 #include "Watchy.h"
 #include "UserModConfig.h"
 
+
 WatchyRTC Watchy::RTC;
 GxEPD2_BW<WatchyDisplay, WatchyDisplay::HEIGHT> Watchy::display(
     WatchyDisplay(DISPLAY_CS, DISPLAY_DC, DISPLAY_RES, DISPLAY_BUSY));
@@ -8,10 +9,6 @@ GxEPD2_BW<WatchyDisplay, WatchyDisplay::HEIGHT> Watchy::display(
 RTC_DATA_ATTR int guiState;
 RTC_DATA_ATTR int menuIndex;
 RTC_DATA_ATTR int UMMenuIndex = 0;
-
-//RTC_DATA_ATTR int UMcurrentWatchFace = 0;
-//RTC_DATA_ATTR int* UMPointers[USERMOD_MENU_LENGTH] = {&UMcurrentWatchFace};
-
 RTC_DATA_ATTR BMA423 sensor;
 RTC_DATA_ATTR bool WIFI_CONFIGURED;
 RTC_DATA_ATTR bool BLE_CONFIGURED;
@@ -22,18 +19,20 @@ RTC_DATA_ATTR long gmtOffset = 0;
 RTC_DATA_ATTR bool alreadyInMenu         = true;
 RTC_DATA_ATTR tmElements_t bootTime;
 
+RTC_DATA_ATTR int UMcurrentWatchFace = 0;
+extern RTC_DATA_ATTR int UMtestValue = 0;
+RTC_DATA_ATTR int* UMPointers[USERMOD_MENU_LENGTH] = {&UMcurrentWatchFace, &UMtestValue};
+
 void Watchy::init(String datetime) {
   esp_sleep_wakeup_cause_t wakeup_reason;
   wakeup_reason = esp_sleep_get_wakeup_cause(); // get wake up reason
   Wire.begin(SDA, SCL);                         // init i2c
   RTC.init();
-
   // Init the display here for all cases, if unused, it will do nothing
   display.epd2.selectSPI(SPI, SPISettings(20000000, MSBFIRST, SPI_MODE0)); // Set SPI to 20Mhz (default is 4Mhz)
   display.init(0, displayFullInit, 10,
                true); // 10ms by spec, and fast pulldown reset
   display.epd2.setBusyCallback(displayBusyCallback);
-
   switch (wakeup_reason) {
   case ESP_SLEEP_WAKEUP_EXT0: // RTC Alarm
     RTC.read(currentTime);
@@ -100,7 +99,6 @@ void Watchy::deepSleep() {
     esp_sleep_disable_wakeup_source(ESP_SLEEP_WAKEUP_ALL);
   displayFullInit = false; // Notify not to init it again
   RTC.clearAlarm();        // resets the alarm flag in the RTC
-
   // Set GPIOs 0-39 to input to avoid power leaking out
   const uint64_t ignore = 0b11110001000000110000100111000010; // Ignore some GPIOs due to resets
   for (int i = 0; i < GPIO_NUM_MAX; i++) {
@@ -364,6 +362,9 @@ void Watchy::showUserMods(byte menuIndex, bool partialRefresh) {
 
 void Watchy::handleOpenUMApp(byte mIndex,bool partialRefresh) {
   guiState = USERMOD_APP_STATE;
+  int16_t  x1, y1;
+  uint16_t w, h;
+
   display.setFullWindow();
   display.fillScreen(GxEPD_BLACK);
   display.setFont(&FreeMonoBold9pt7b);
@@ -371,6 +372,10 @@ void Watchy::handleOpenUMApp(byte mIndex,bool partialRefresh) {
   display.setCursor(0, 20);
 
   display.println(UMMods[mIndex]);
+  
+  display.setFont(&FreeMonoBold18pt7b);
+  display.getTextBounds(String(*UMPointers[mIndex]),50, 50, &x1, &y1, &w, &h);
+  display.setCursor(100-w/2,100);
   display.println(*UMPointers[mIndex]);
 
   display.display(partialRefresh); // full refresh
@@ -463,6 +468,11 @@ void Watchy::showAbout() {
   float voltage = getBatteryVoltage();
   display.print(voltage);
   display.println("V");
+
+  display.println("CPU temperature: ");
+  display.print("   ");
+  display.print(sensor.readTemperature());
+  display.println(" C");
 
   display.print("Uptime: ");
   RTC.read(currentTime);
@@ -754,7 +764,7 @@ void Watchy::drawWatchFace() {
   }
   display.println(currentTime.Minute);*/
   int menuItems[] = {};
-  for (int i = 0; i < sizeof(UMPointers); i++)
+  for (int i = 0; i < USERMOD_MENU_LENGTH; i++)
   {
     menuItems[i] = *(UMPointers[i]);
   }

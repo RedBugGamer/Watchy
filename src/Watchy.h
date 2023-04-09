@@ -11,6 +11,7 @@
 #include <Wire.h>
 #include <Fonts/FreeMonoBold9pt7b.h>
 #include "DSEG7_Classic_Bold_53.h"
+#include <Fonts/FreeMonoBold18pt7b.h>
 #include "Display.h"
 #include "WatchyRTC.h"
 #include "BLE.h"
