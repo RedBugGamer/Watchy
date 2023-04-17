@@ -18,13 +18,14 @@ RTC_DATA_ATTR bool displayFullInit       = true;
 RTC_DATA_ATTR long gmtOffset = 0;
 RTC_DATA_ATTR bool alreadyInMenu         = true;
 RTC_DATA_ATTR tmElements_t bootTime;
+RTC_DATA_ATTR tmElements_t TimeDifferenceTime;
 
 // add your own variables here:
 RTC_DATA_ATTR int UMcurrentWatchFace = 0;
-RTC_DATA_ATTR int UMtestValue = 0;
+RTC_DATA_ATTR int UMTimer = 0;
 
 // add pointers to your variables here
-RTC_DATA_ATTR int* UMPointers[USERMOD_MENU_LENGTH] = {&UMcurrentWatchFace, &UMtestValue};
+RTC_DATA_ATTR int* UMPointers[USERMOD_MENU_LENGTH] = {&UMcurrentWatchFace, &UMTimer};
 
 void Watchy::init(String datetime) {
   esp_sleep_wakeup_cause_t wakeup_reason;
@@ -79,11 +80,24 @@ void Watchy::init(String datetime) {
     gmtOffset = settings.gmtOffset;
     RTC.read(currentTime);
     RTC.read(bootTime);
+    RTC.read(TimeDifferenceTime);
     showWatchFace(false); // full update on reset
     vibMotor(75, 4);
     break;
   }
   deepSleep();
+}
+
+int Watchy::getTimeDifference() {
+  int diffInMinutes = abs(
+    makeTime(currentTime)-makeTime(TimeDifferenceTime)-currentTime.Second - TimeDifferenceTime.Second
+  )/60;
+  if (diffInMinutes>0)
+  {
+    RTC.read(TimeDifferenceTime);
+  }
+  //Serial.println(diffInMinutes);
+  return diffInMinutes;
 }
 
 int Watchy::getUserModValue(int index) {
@@ -168,13 +182,15 @@ void Watchy::handleButtonPress() {
     } else if (guiState == APP_STATE) {
       showMenu(menuIndex, false); // exit to menu if already in app
     } else if (guiState == USERMOD_MENU_STATE) { // TODO: go back to Main menu instead of watchFace
-      showMenu(menuIndex, false);
+      RTC.read(currentTime);
+      showWatchFace(false);
     } else if (guiState == FW_UPDATE_STATE) {
       showMenu(menuIndex, false); // exit to menu if already in app
     } else if (guiState == USERMOD_APP_STATE) {
       showUserMods(menuIndex, false);
     } else if (guiState == WATCHFACE_STATE) {
-      return;
+      RTC.read(currentTime);
+      showWatchFace(false);
     }
   }
   // Up Button
@@ -265,6 +281,9 @@ void Watchy::handleButtonPress() {
           handleOpenUMApp(UMMenuIndex,false);
         } else if (guiState == FW_UPDATE_STATE) {
           updateFWBegin();
+        } else if (guiState ==
+        WATCHFACE_STATE) { // enter menu state if coming from watch face
+          showMenu(menuIndex, false);
         }
       } else if (digitalRead(BACK_BTN_PIN) == 1) {
         lastTimeout = millis();
@@ -276,11 +295,15 @@ void Watchy::handleButtonPress() {
         } else if (guiState == APP_STATE) {
           showMenu(menuIndex, false); // exit to menu if already in app
         } else if (guiState == USERMOD_MENU_STATE) { // TODO: go back to Main menu instead of watchFace
-          showMenu(menuIndex, false);
+          RTC.read(currentTime);
+          showWatchFace(false);
         } else if (guiState == USERMOD_APP_STATE) {
           showUserMods(menuIndex, false);
         } else if (guiState == FW_UPDATE_STATE) {
           showMenu(menuIndex, false); // exit to menu if already in app
+        }  else if (guiState == WATCHFACE_STATE) {
+          RTC.read(currentTime);
+          showWatchFace(false);
         }
       } else if (digitalRead(UP_BTN_PIN) == 1) {
         lastTimeout = millis();
@@ -765,16 +788,17 @@ void Watchy::drawWatchFace() {
     display.print("0");
   }
   display.println(currentTime.Minute);*/
-  int menuItems[] = {};
+
+  /*int menuItems[] = {};
   for (int i = 0; i < USERMOD_MENU_LENGTH; i++)
   {
     menuItems[i] = *(UMPointers[i]);
-  }
+  }*/
   
-  UMdrawWatchFace(menuItems);
+  UMdrawWatchFace(UMPointers);
 }
 
-void Watchy::UMdrawWatchFace(int UMPointers[]) {
+void Watchy::UMdrawWatchFace(int *UMPointers[]) {
   
 }
 
@@ -966,7 +990,7 @@ void Watchy::_bmaConfig() {
 void Watchy::setupWifi() {
   display.epd2.setBusyCallback(0); // temporarily disable lightsleep on busy
   WiFiManager wifiManager;
-  wifiManager.resetSettings();
+  //wifiManager.resetSettings();
   wifiManager.setTimeout(WIFI_AP_TIMEOUT);
   wifiManager.setAPCallback(_configModeCallback);
   display.setFullWindow();

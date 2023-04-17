@@ -52,6 +52,7 @@ public:
 public:
   explicit Watchy(const watchySettings &s) : settings(s) {} // constructor
   void init(String datetime = "");
+  int getTimeDifference();
   void deepSleep();
   static void displayBusyCallback(const void *);
   float getBatteryVoltage();
@@ -83,7 +84,7 @@ public:
   void showWatchFace(bool partialRefresh);
   virtual void drawWatchFace(); // override this method for different watch
                                 // faces
-  virtual void UMdrawWatchFace(int UMPointers[]);
+  virtual void UMdrawWatchFace(int *UMPointers[]);
 private:
   void _bmaConfig();
   static void _configModeCallback(WiFiManager *myWiFiManager);

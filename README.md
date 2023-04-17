@@ -4,7 +4,7 @@ WatchyUserMod is a fork of the official Watchy repository that adds a Usermod el
 1. Download this Repository as a .zip file. Extract it into your libraries folder.
 2. Move the original library to another location which is not in your libraries folder to prevent complications.
 3. Technically you're good to go now but you won't be able to access your custom settings right away.
-4. To make your Watchface compatible you just have to rename your `drawWatchFace()` method to `UMdrawWatchFace(int values[])`. Now you can access Uservalues by using `values[index]`. (Other ways are currently not possible)
+4. To make your Watchface compatible you just have to rename your `drawWatchFace()` method to `UMdrawWatchFace(int *values[])`. Now you can access Uservalues by using `*values[index]`. (Other ways are currently not possible)
 
 ## Switching Watchface
 1. Create a switch case statment in your `UMdrawWatchFace` like `switch (values[0]) {}`. The first element of values is already definde as the current Watchface but you can change that.

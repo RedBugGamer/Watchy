@@ -6,11 +6,11 @@
 
 // Add your own custom values here:
 extern RTC_DATA_ATTR int UMcurrentWatchFace;
-extern RTC_DATA_ATTR int UMtestValue;
+extern RTC_DATA_ATTR int UMTimer;
 
 
 extern RTC_DATA_ATTR int* UMPointers[USERMOD_MENU_LENGTH];
 
-const char* UMMods[] = {"Switch WatchFace","test"};
+const char* UMMods[] = {"Switch WatchFace","Timer"};
 
 #endif
